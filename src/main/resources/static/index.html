@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fashion Store App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #ff3b30;
+            --primary-dark: #d32f2f;
+            --accent: #00c853;
+            --bg: #f8f9fa;
+            --text: #333;
+            --card-bg: #ffffff;
+        }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding-bottom: 80px; background-color: var(--bg); color: var(--text); }
+        .header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 15px 20px; position: sticky; top: 0; z-index: 1000; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .view { display: none; padding: 15px; animation: fadeIn 0.3s ease-in-out; }
+        .active-view { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .filter-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; scrollbar-width: none; }
+        .filter-btn { background: white; border: 1px solid #ddd; padding: 8px 16px; border-radius: 20px; white-space: nowrap; cursor: pointer; transition: 0.2s; }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 2px 5px rgba(255, 59, 48, 0.3); }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        .product-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+        .product-card img { width: 100%; height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+        .btn-add { background: var(--primary); color: white; border: none; padding: 10px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-add:active { transform: scale(0.98); }
+        .btn-add:disabled { background: #ccc; cursor: not-allowed; }
+        .cart-item { background: white; padding: 15px; margin-bottom: 12px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .cart-controls button { background: none; border: none; font-weight: bold; font-size: 1.2rem; cursor: pointer; color: var(--primary); }
+        .btn-checkout { background: var(--accent); color: white; width: 100%; padding: 16px; font-size: 1.1rem; border: none; border-radius: 12px; margin-top: 20px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,200,83,0.3); }
+        .order-card { background: white; padding: 16px; margin-bottom: 15px; border-radius: 12px; border-left: 5px solid var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.08); cursor: pointer; }
+        .status-badge { padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; }
+        .status-pending { background: #fff3e0; color: #ff9800; }
+        .status-shipped { background: #e3f2fd; color: #2196f3; }
+        .status-delivered { background: #e8f5e9; color: #4caf50; }
+        .order-details { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; animation: slideDown 0.3s ease-out; }
+        .order-item-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; color: #555; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #f0f0f0; z-index: 1000; }
+        .nav-item { text-align: center; color: #aaa; cursor: pointer; font-size: 0.75rem; position: relative; transition: 0.2s; }
+        .nav-item.active { color: var(--primary); transform: translateY(-2px); }
+        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+        .badge { position: absolute; top: -5px; right: 10px; background: var(--primary); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; display: none; }
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 12px; position: fixed; z-index: 2000; left: 50%; bottom: 80px; transform: translateX(-50%); opacity: 0; transition: 0.3s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 90px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 style="margin:0;">Fashion Store</h2>
+        <i class="fas fa-bell"></i>
+    </div>
+
+    <div id="home-view" class="view active-view">
+        <div class="filter-scroll">
+            <button class="filter-btn active" onclick="filterProducts('All', this)">All</button>
+            <button class="filter-btn" onclick="filterProducts('TSH', this)">T-Shirts</button>
+            <button class="filter-btn" onclick="filterProducts('PNT', this)">Pants</button>
+        </div>
+        <div class="product-grid" id="product-list">
+            <p style="text-align:center; width:100%;">Loading products...</p>
+        </div>
+    </div>
+
+    <div id="cart-view" class="view">
+        <h3 style="margin-top:0;">My Shopping Bag</h3>
+        
+        <div id="cart-error-box" style="display: none; background-color: #fed7d7; color: #9b2c2c; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 600; align-items: center; gap: 10px;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="cart-error-message"></span>
+        </div>
+
+        <div id="cart-items-container"></div>
+        
+        <div style="background: white; padding: 15px; border-radius: 12px; margin-top: 20px;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem;">
+                <span>Total</span>
+                <span id="cart-total" style="color:var(--primary);">$0.00</span>
+            </div>
+        </div>
+        <button class="btn-checkout" onclick="placeOrder()">Checkout Now</button>
+    </div>
+
+    <div id="bags-view" class="view">
+        <h3 style="margin-top:0;">My Orders</h3>
+        <div id="orders-container"></div>
+    </div>
+
+    <div id="profile-view" class="view">
+        <div style="text-align:center; padding:20px; background:white; border-radius:12px;">
+            <i class="fas fa-user-circle" style="font-size:4rem; color:var(--primary);"></i>
+            <h3 id="profile-name">User</h3>
+            <button onclick="logout()" style="background:#ffebee; color:red; border:none; padding:10px 20px; border-radius:5px; font-weight:bold;">Logout</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('home-view', this)"><i class="fas fa-home"></i> Home</div>
+        <div class="nav-item" onclick="switchTab('cart-view', this)">
+            <span id="cart-count" class="badge">0</span>
+            <i class="fas fa-shopping-cart"></i> Cart
+        </div>
+        <div class="nav-item" onclick="switchTab('bags-view', this)"><i class="fas fa-shopping-bag"></i> Bags</div>
+        <div class="nav-item" onclick="switchTab('profile-view', this)"><i class="fas fa-user"></i> Profile</div>
+    </div>
+
+    <div id="toast">Item Added to Cart!</div>
+
+    <script>
+        // ────────────────────────────────────────────────
+        // Global variables
+        // ────────────────────────────────────────────────
+        let currentUserId = null;
+        let currentUserName = null;
+        let cart = JSON.parse(localStorage.getItem("myCart")) || [];
+        let allProducts = [];
+
+        // ────────────────────────────────────────────────
+        // Fetch current user on page load
+        // ────────────────────────────────────────────────
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const response = await fetch('/api/users/current-user');
+
+                if (response.ok) {
+                    const user = await response.json();
+                    currentUserId = user.id;
+                    currentUserName = user.username || user.name || "User";
+
+                    console.log("Logged in as:", currentUserName, "ID:", currentUserId);
+
+                    document.getElementById("profile-name").innerText = currentUserName;
+                    updateCartUI();
+                    loadProducts();
+                } else {
+                    console.log("Not logged in or session expired");
+                    window.location.href = "login.html";
+                }
+            } catch (error) {
+                console.error("Error fetching current user:", error);
+                window.location.href = "login.html";
+            }
+        });
+
+        // ────────────────────────────────────────────────
+        // Toast
+        // ────────────────────────────────────────────────
+        function showToast(msg) {
+            const t = document.getElementById("toast");
+            t.innerText = msg;
+            t.className = "show";
+            setTimeout(() => t.className = "", 3000);
+        }
+
+        // ────────────────────────────────────────────────
+        // Tab switching
+        // ────────────────────────────────────────────────
+        function switchTab(viewId, navEl) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
+            document.getElementById(viewId).classList.add('active-view');
+
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            navEl.classList.add('active');
+
+            if (viewId === 'bags-view') {
+                loadOrders();
+            }
+        }
+
+        // ────────────────────────────────────────────────
+        // Products
+        // ────────────────────────────────────────────────
+        function loadProducts() {
+            fetch('/products')
+                .then(res => res.json())
+                .then(products => {
+                    allProducts = products;
+                    renderProducts(allProducts);
+                })
+                .catch(err => console.error("Failed to load products:", err));
+        }
+
+        function renderProducts(products) {
+            const container = document.getElementById('product-list');
+            container.innerHTML = '';
+            products.forEach(p => {
+                let stockBadge = '';
+                let btnDisabled = '';
+                let btnText = '<i class="fas fa-plus"></i> Add';
+
+                if (p.stockQuantity === 0) {
+                    stockBadge = '<div style="color:red; font-size:0.8rem; font-weight:bold;">Out of Stock</div>';
+                    btnDisabled = 'disabled';
+                    btnText = 'Sold Out';
+                } else if (p.stockQuantity < 10) {
+                    stockBadge = `<div style="color:var(--primary); font-size:0.8rem; font-weight:bold;">Hurry! Only ${p.stockQuantity} left</div>`;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                div.innerHTML = `
+                    <img src="${p.imageUrl || 'https://via.placeholder.com/150'}" onerror="this.src='https://via.placeholder.com/150'">
+                    <div>
+                        ${stockBadge}
+                        <div style="font-weight:600; margin:5px 0;">${p.name}</div>
+                        <div style="color:var(--accent); font-weight:bold;">$${p.price}</div>
+                        <button class="btn-add" ${btnDisabled} onclick="addToCart(${p.id})">
+                            ${btnText}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterProducts(cat, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (cat === 'All') {
+                renderProducts(allProducts);
+            } else {
+                renderProducts(allProducts.filter(p => p.skuCode && p.skuCode.includes(cat)));
+            }
+        }
+
+        // ────────────────────────────────────────────────
+        // Cart Logic (local + UI)
+        // ────────────────────────────────────────────────
+        function addToCart(productId) {
+            const product = allProducts.find(p => p.id === productId);
+            if (!product) return;
+
+            let existingItem = cart.find(item => item.id === productId);
+            if (existingItem) {
+                if (existingItem.qty >= product.stockQuantity) {
+                    return showToast("No more stock available!");
+                }
+                existingItem.qty++;
+            } else {
+                let newItem = { ...product, qty: 1 };
+                cart.push(newItem);
+            }
+            saveCart();
+            showToast("Added to Bag!");
+        }
+
+        function changeQty(idx, delta) {
+            const item = cart[idx];
+            if (delta > 0 && item.qty >= item.stockQuantity) {
+                return showToast("Max stock reached");
+            }
+
+            item.qty += delta;
+            if (item.qty <= 0) cart.splice(idx, 1);
+            saveCart();
+        }
+
+        function saveCart() {
+            localStorage.setItem("myCart", JSON.stringify(cart));
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items-container');
+            const badge = document.getElementById('cart-count');
+
+            let totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+            badge.style.display = totalQty > 0 ? 'block' : 'none';
+            badge.innerText = totalQty;
+
+            let total = 0;
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#aaa;">Bag is empty</p>';
+            }
+
+            cart.forEach((item, idx) => {
+                total += item.price * item.qty;
+                const div = document.createElement('div');
+                div.className = 'cart-item';
+                div.innerHTML = `
+                    <div><strong>${item.name}</strong><br>$${item.price}</div>
+                    <div class="cart-controls">
+                        <button onclick="changeQty(${idx}, -1)" style="color:var(--primary); font-weight:bold;">-</button>
+                        <span style="margin:0 10px;">${item.qty}</span>
+                        <button onclick="changeQty(${idx}, 1)" style="color:green; font-weight:bold;">+</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('cart-total').innerText = "$" + total.toFixed(2);
+        }
+
+        // ────────────────────────────────────────────────
+        // Place Order – with graceful error display
+        // ────────────────────────────────────────────────
+        function placeOrder() {
+            if (cart.length === 0) return showToast("Cart is empty");
+            if (!currentUserId) return showToast("Please log in again");
+
+            // Hide error box on new attempt
+            document.getElementById('cart-error-box').style.display = 'none';
+
+            const orderData = {
+                userId: currentUserId,
+                cartItems: cart.map(i => ({ productId: i.id, quantity: i.qty }))
+            };
+
+            fetch('/orders/place', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderData)
+            })
+            .then(async res => {
+                if (res.ok) {
+                    showToast("Order Successful!");
+                    cart = [];
+                    saveCart();
+                    switchTab('bags-view', document.querySelectorAll('.nav-item')[2]);
+                } else {
+                    const errData = await res.json();
+                    const errorBox = document.getElementById('cart-error-box');
+                    const errorMsg = document.getElementById('cart-error-message');
+                    
+                    errorMsg.innerText = errData.error || "An error occurred while placing your order.";
+                    errorBox.style.display = 'flex';
+                }
+            })
+            .catch(() => showToast("Network error"));
+        }
+
+        // ────────────────────────────────────────────────
+        // Load Orders (only when needed)
+        // ────────────────────────────────────────────────
+        function loadOrders() {
+            if (!currentUserId) return;
+
+            fetch(`/orders/user/${currentUserId}`)
+                .then(res => res.json())
+                .then(orders => {
+                    const container = document.getElementById('orders-container');
+                    container.innerHTML = '';
+                    orders.sort((a,b) => b.id - a.id);
+
+                    orders.forEach(o => {
+                        let dateText = "Date Pending";
+                        if (o.deliveryDate) dateText = "Expected: " + new Date(o.deliveryDate).toLocaleDateString();
+
+                        let statusClass = 'status-pending';
+                        let statusIcon = 'fa-clock';
+                        let actionButton = '';
+
+                        if (o.trackingStatus === 'Shipped') {
+                            statusClass = 'status-shipped';
+                            statusIcon = 'fa-truck';
+                            actionButton = `<button onclick="confirmReceived(${o.id}, event)" style="margin-top:10px; width:100%; padding:10px; background:#00c853; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">I Received This Order</button>`;
+                        }
+
+                        if (o.trackingStatus === 'Delivered') {
+                            statusClass = 'status-delivered';
+                            statusIcon = 'fa-check-circle';
+                            dateText = "Delivered";
+                            actionButton = `<button onclick="returnOrder(${o.id}, event)" style="margin-top:10px; width:100%; padding:10px; background:#d32f2f; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Return / Refund</button>`;
+                        }
+
+                        if (o.trackingStatus === 'Returned') {
+                            statusClass = 'status-pending';
+                            statusIcon = 'fa-undo';
+                            dateText = "Refunded";
+                            actionButton = `<div style="margin-top:10px; text-align:center; color:#d32f2f; font-weight:bold;"><i class="fas fa-undo"></i> Returned</div>`;
+                        }
+
+                        let itemsHtml = '';
+                        if (o.items) {
+                            o.items.forEach(item => {
+                                let pName = item.product ? item.product.name : "Unknown Item";
+                                itemsHtml += `<div class="order-item-row"><span>${pName} <span style="color:#999;">(x${item.quantity})</span></span><span>$${item.priceAtPurchase}</span></div>`;
+                            });
+                        }
+
+                        const div = document.createElement('div');
+                        div.className = 'order-card';
+                        div.onclick = () => toggleOrderDetails(o.id);
+
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <strong>Order #${o.id} <i id="icon-${o.id}" class="fas fa-chevron-down" style="color:#aaa; font-size:0.8rem; margin-left:5px; transition:0.3s;"></i></strong>
+                                <span class="status-badge ${statusClass}"><i class="fas ${statusIcon}"></i> ${o.trackingStatus || 'Pending'}</span>
+                            </div>
+                            <div style="font-size:0.9rem; color:#666; margin:5px 0;">${dateText}</div>
+                            <div style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;">
+                                Items: ${o.items.length} <span style="float:right; font-weight:bold; color:var(--primary);">$${o.totalAmount}</span>
+                            </div>
+                            <div id="details-${o.id}" class="order-details">
+                                <h5 style="margin:0 0 10px 0;">Items</h5>
+                                ${itemsHtml}
+                                ${actionButton}
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                })
+                .catch(err => console.error("Failed to load orders:", err));
+        }
+
+        function returnOrder(orderId, event) {
+            event.stopPropagation();
+            const reason = prompt("Please enter the reason for return:");
+            if (!reason) return;
+
+            fetch(`/orders/${orderId}/return`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: reason
+            })
+            .then(res => {
+                if (res.ok) {
+                    showToast("Return Request Sent to Admin.");
+                    loadOrders();
+                } else {
+                    showToast("Error sending request.");
+                }
+            });
+        }
+
+        function toggleOrderDetails(id) {
+            const el = document.getElementById('details-' + id);
+            const icon = document.getElementById('icon-' + id);
+            if (el.style.display === "block") {
+                el.style.display = "none";
+                icon.style.transform = "rotate(0deg)";
+            } else {
+                el.style.display = "block";
+                icon.style.transform = "rotate(180deg)";
+            }
+        }
+
+        function confirmReceived(orderId, event) {
+            event.stopPropagation();
+            if (!confirm("Have you received this order?")) return;
+
+            fetch(`/orders/${orderId}/confirm-delivery`, { method: 'POST' })
+                .then(res => {
+                    if (res.ok) {
+                        showToast("Delivery Confirmed! Thank you.");
+                        loadOrders();
+                    }
+                });
+        }
+
+        function logout() {
+            fetch('/logout', { method: 'POST' })
+                .then(() => {
+                    localStorage.clear();
+                    window.location.href = "login.html";
+                })
+                .catch(() => {
+                    localStorage.clear();
+                    window.location.href = "login.html";
+                });
+        }
+    </script>
+</body>
+</html>
